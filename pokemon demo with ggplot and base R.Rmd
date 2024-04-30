@@ -1,0 +1,178 @@
+---
+title: "pokemon data demo"
+author: "Deyvis Mejia Zambrana"
+date: "`r Sys.Date()`"
+output: html_document
+---
+ Tutorial followed and modified from: 
+ https://brunomioto.com/posts/intro_ggplot2/en/#the-data
+ 
+ Check out my rpubs site for other scripts: https://rpubs.com/deyvis305/
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+
+# Packages required for this tutorial
+```{r packages}
+library(dplyr)
+library(ggplot2)
+library(ggpath)                     
+library(magick)
+library(pokemon)
+```
+
+
+
+
+# Pokemon data from the "pokemon" package
+```{r pokmeon data}
+#load dataset into environment
+pokemon.df=pokemon::pokemon # '=' or '<-' are assignment operators
+```
+
+
+
+
+# Base R plot of pokemon weight and height
+```{r base plot}
+#base R plotting
+plot(pokemon.df$weight, pokemon.df$height)
+```
+
+Label the axes. 
+```{r}
+plot(pokemon.df$weight, pokemon.df$height, 
+     xlab ="kg", ylab = "m", main="pokemon heights and weights")
+?plot() #use to see documentation or use help(plot)
+```
+
+Look at the data.
+```{r}
+#glimpse the data
+glimpse(pokemon.df) #notice the type of each column, any missing values
+
+#head of the data (first rows)
+head(pokemon.df)
+
+#tail of the data (last rows)
+tail(pokemon.df) #there are a total of 10,147
+```
+
+Is there a relationship between height and weight?
+```{r}
+?cor() #correlation function
+cor(pokemon.df$weight, pokemon.df$height, 
+    method="pearson")
+
+#okay now add a linear regression line to the previous plot
+plot(pokemon.df$weight, pokemon.df$height,
+     xlab = "height (m)", ylab="weight (kg)", main="pokemon heights and weights")
+abline(lm(height ~ weight,data = pokemon.df),
+       col="red")
+```
+
+
+Is there a relationship between weight and speed?
+```{r}
+#cor
+cor(pokemon.df$weight, pokemon.df$speed) #no correlation
+
+#assume that pokemon speeds are in m/s units
+plot(x=pokemon.df$weight, y=pokemon.df$speed,
+     xlab="weight (kg)",ylab="speed (m/s)", 
+     main = "relationship between pokemon speed and weight")
+abline(lm(speed ~ weight, data=pokemon.df),
+       col="blue")
+```
+
+
+
+
+# Using the ggplot package
+
+```{r ggplot}
+#ggplot2 is part of the tidyverse packages
+#and can use different syntax to do same things
+#The + sign means 'add this'
+ggplot()                                       #1 graphics layer
+ggplot(data=pokemon.df,aes(x=weight,y=height)) #2 graphics layers
+ggplot(data=pokemon.df,aes(x=weight,y=height))+
+  geom_point()                                 #3 graphics layers
+```
+
+Now let's pimp up the ggplot by adding color and shapes.
+```{r}
+#pimp up the plot! make color relative to type_1 data categories
+ggplot(
+  data=pokemon.df, aes(x=weight,y=height))+
+  geom_point(shape=25,
+             aes(color=type_1))+
+  ggtitle("heights and weights of pokemon according to type_1")+
+  theme_bw()+
+  geom_smooth() #adds a smooth regression line using a default method
+```
+
+To summartize: there seems to be a maximum for heights as weight increase.
+Most of the pokemon are clustered between height 0 to 5 m and 0 to 500 kg.
+
+We can calculate the range, average, and median for the heights and weights
+```{r}
+#descriptive statistics
+range(pokemon.df$height) #heights range
+mean(pokemon.df$height)  #average height
+median(pokemon.df$height)#median height
+
+range(pokemon.df$weight) #weights range
+mean(pokemon.df$weight)  #average weight
+median(pokemon.df$weight)#median weight
+```
+## Box plots
+```{r ggplot boxplots}
+#box plots of heights for all pokemon FIRST type
+ggplot(data=pokemon.df,aes(x=type_1,y=height))+
+  geom_boxplot(aes(color=type_1))+
+  theme(axis.text.x = element_text(angle=50, vjust=0.5))+
+  ggtitle("height distributions based on pokemon's first type")
+```
+```{r}
+#box plots of weights for all pokemon FIRST type
+ggplot(data=pokemon.df,aes(x=type_1, y=weight))+
+  geom_boxplot(aes(color=type_1))+
+  theme(axis.text.x = element_text(angle=50, vjust=0.5))+
+  ggtitle("weight distributions based on pokemon's first type")
+```
+
+```{r}
+#box plots of HP for all pokemon FIRST type
+ggplot(data=pokemon.df,aes(x=type_1, y=hp))+
+  geom_boxplot(aes(color=type_1))+
+  theme(axis.text.x = element_text(angle=50, vjust=0.5))+
+  ggtitle("health point distributions based on pokemon's first type")
+```
+
+```{r}
+#box plots of speeds for all pokemon FIRST type
+ggplot(data=pokemon.df,aes(x=type_1, y=speed))+
+  geom_boxplot(aes(color=type_1))+
+  theme(axis.text.x = element_text(angle=50, vjust=0.5))+
+  ggtitle("speed distributions based on pokemon's first type")
+```
+
+## Column plots using ggplot
+
+```{r column plot defense}
+#column plots of the defense of all pokemons in the dataset
+ggplot(data=pokemon.df, aes(x=pokemon,y=defense))+
+  geom_col()+
+  ggtitle("defense scores for all pokemon")
+```
+
+
+What is the difference between geom_col and geom_bar? 
+Use ?geom_col and ?geom_bar.
+
+THE END
