@@ -7,7 +7,7 @@ output: html_document
  Tutorial followed and modified from: 
  https://brunomioto.com/posts/intro_ggplot2/en/#the-data
  
- Check out my rpubs site for other scripts: https://rpubs.com/deyvis305/
+ Check out the published R script and output in rpubs: https://rpubs.com/deyvis305/
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
