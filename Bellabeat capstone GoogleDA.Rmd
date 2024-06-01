@@ -1,0 +1,419 @@
+---
+title: "Bellabeat Google DA Project"
+author: "Deyvis Mejia Zambrana"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    toc: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(tidyverse)
+```
+
+# clean the weight and bmi data for fitbit users
+```{r}
+weight<-read.csv("C:\\Users\\deyvi\\OneDrive\\Desktop\\R files\\mturkfitbit_export_3.12.16-4.11.16\\Fitabase Data 3.12.16-4.11.16\\weightLogInfo_merged.csv")
+```
+
+```{r}
+library(tidyverse)
+weight %>% 
+  group_by_all() %>% 
+  filter(n()>1) %>% 
+  ungroup()
+#no duplicate rows
+
+n_distinct(weight$Id) #11
+length(weight) #8 variables or columns
+names(weight)
+length(weight$Id) #33 rows
+
+
+weight %>% 
+  group_by(Id) %>% 
+  filter(n()>1) %>% 
+  ungroup()
+#25 of 33 rows contain duplicates
+
+ggplot(weight, aes(WeightKg,BMI))+
+  geom_point()
+
+class(weight$Id)
+weight$Id<-as.factor(weight$Id)
+ggplot(weight,aes(WeightKg,BMI))+
+  geom_point(aes(color = Id,shape = Id))
+ggplot(weight,aes(WeightKg,BMI))+
+  geom_point(aes(color = Id))
+class(weight$Date)
+
+weight<-weight %>% 
+  separate(Date,c("date","time","meridiem"), sep=" ")
+#reassign the data frame so the df is not printed in the console
+#but updates the data frame
+View(weight)
+
+#if you want to do the opposite of separate you can
+#use the paste function, may need to use mutate as well
+
+weight$meridiem<-as.factor(weight$meridiem)
+
+weight$date<-as.character(weight$date)
+```
+
+```{r}
+weight<-weight %>% 
+  separate(date, c("month", "day", "year", sep="/"))
+
+weight<-weight %>% 
+  select(-`/`)
+
+weight$month[weight$month == "3"]<-"03"
+weight$month[weight$month == "4"]<-"04"
+
+weight$day<-as.character(weight$day)
+weight$day[weight$day == "1"]<-"01"
+weight$day[weight$day == "2"]<-"02"
+weight$day[weight$day == "3"]<-"03"
+weight$day[weight$day == "4"]<-"04"
+weight$day[weight$day == "5"]<-"05"
+weight$day[weight$day == "6"]<-"06"
+weight$day[weight$day == "7"]<-"07"
+weight$day[weight$day == "8"]<-"08"
+weight$day[weight$day == "9"]<-"09"
+
+weight<-weight %>% 
+  mutate(ymd = paste(weight$year,weight$month,weight$day,
+                     sep = "-"))
+
+weight$ymd<-as.Date(weight$ymd)
+```
+
+
+# Plots for weight and BMI
+```{r}
+
+ggplot(weight,aes(WeightKg,BMI))+
+  geom_point(aes(color = Id))+
+  facet_wrap(~meridiem)+
+  xlim(c(0,140))+
+  ylim(c(0,50))
+
+#plotting for day should work even if it's a string, but may not be ordered
+ggplot(weight,aes(ymd,BMI))+
+  geom_point(aes(color = Id))+
+  facet_wrap(~meridiem)+
+  theme(axis.text.x = element_text(angle = 70, vjust = 0.5))
+
+#colors are not super clear, make a plotly
+library(plotly)
+
+bmi<-ggplot(weight,aes(ymd,BMI))+
+  geom_point(aes(color = Id, shape = meridiem))+
+  theme(axis.text.x = element_text(angle = 70, vjust = 0.5))
+bmi
+ggplotly(bmi)#not working as facet_wrap ~meridiem,
+#I changed the shape to meridiem then..
+#plotly is not rendering. I will reinstall plotly
+install.packages("plotly")
+#maybe dual axis?
+ggplot(weight,aes(ymd,WeightKg))+
+  geom_point(aes(color = Id, shape = meridiem))+
+  theme(axis.text.x = element_text(angle = 70, vjust = 0.5))
+
+#mean weights and bmi
+weight %>% 
+  group_by(Id) %>% 
+  summarize(avg_weight = mean(WeightKg),avg_bmi = mean(BMI)) %>% 
+  arrange(desc(avg_weight))
+#DATA IS INCOMPLETE!
+```
+
+
+# Daily Activity data
+```{r}
+daily_activity<-read.csv("C:\\Users\\deyvi\\OneDrive\\Desktop\\R files\\mturkfitbit_export_3.12.16-4.11.16\\Fitabase Data 3.12.16-4.11.16\\dailyActivity_merged.csv")
+class(daily_activity$Id)
+daily_activity$Id<-as.factor(daily_activity$Id)
+#group_by numeric will not work, convert Id to string or factor
+
+activity<-daily_activity %>% 
+  group_by(Id) %>% 
+  summarize(avg_VAM = sum(VeryActiveMinutes),
+            avg_FAM = sum(FairlyActiveMinutes),
+            avg_LAM = sum(LightlyActiveMinutes))
+plot_ly(activity,type = "scatter3d", mode="markers",
+        x = ~avg_VAM, y = ~avg_FAM, z = ~avg_LAM,
+        color = ~Id, colors = c("pink","green3","cornflowerblue"))
+
+ggplot(activity,aes(avg_FAM,avg_LAM))+
+  geom_point(aes(color=Id))
+ggplot(activity,aes(avg_VAM,avg_FAM))+
+  geom_point(aes(color=Id))+
+  geom_smooth(se=F)+
+  geom_smooth(method="lm",color="cyan",se=F)+
+  geom_smooth(method="gam",color="yellow",se=F)+
+  stat_smooth(method='lm', formula = y ~ poly(x,3),
+              color="green")#interesting
+ggplot(activity,aes(avg_LAM,avg_VAM))+
+  geom_point(aes(color=Id))
+#ref https://www.statology.org/polynomial-regression-r/
+
+#for now a distinct approach
+pred1<-predict(lm(activity$avg_FAM~poly(activity$avg_VAM,3)),
+               data=activity[activity$avg_VAM < 300,])
+#error: https://www.statology.org/error-in-evalpredvars-data-env-object-not-found/
+#work around:
+activity_mod<-activity %>%
+  filter(avg_VAM < 300)
+prediction1<-predict(lm(avg_FAM ~ poly(avg_VAM,3),data = activity_mod))
+
+ggplot(activity,aes(avg_VAM,avg_FAM))+
+  geom_point(aes(color=Id))+
+  geom_line(data=activity_mod,aes(x=avg_VAM,y=prediction1),
+            color="blue")
+
+#okay now add the second regression prediction
+activity_mod2<-activity %>%
+  filter(avg_VAM > 300)
+prediction2<-predict(lm(avg_FAM ~ avg_VAM,data = activity_mod2))
+
+ggplot(activity,aes(avg_VAM,avg_FAM))+
+  geom_point(aes(color=Id))+
+  geom_line(data=activity_mod,aes(x=avg_VAM,y=prediction1),
+            color="blue",lwd=1)+
+  geom_line(data = activity_mod2,aes(x=avg_VAM,y=prediction2),
+            color="cornflowerblue",lwd=1)+
+  annotate("text",x=250,y=600,
+           label="lm(avg_FAM~poly(avg_VAM,3) for <300",
+           color="blue",fontface="bold")+
+  annotate("text",x=250,y=550,
+           label="lm(avg_FAM~avg_VAM) for >300",
+           color="cornflowerblue",fontface="bold")
+#note: data point for 2891001357 has unusually high FAM at 0 VAM
+#might be an outlier
+```
+
+
+# Sleep Minutes Data
+```{r}
+min_sleep<-read_csv("C:\\Users\\deyvi\\OneDrive\\Desktop\\R files\\mturkfitbit_export_3.12.16-4.11.16\\Fitabase Data 3.12.16-4.11.16\\minuteSleep_merged.csv")
+
+head(min_sleep)
+#value 1,2,3 mean 1 is asleep, 2 is restless, 3 is awake
+
+n_distinct(min_sleep$Id) #23 Ids
+
+min_sleep %>% 
+  group_by(Id) %>% 
+  summarize(avg_slpstate = mean(value)) %>% 
+  arrange(desc(avg_slpstate)) # top 5 people with least sleep
+# 3977333714         1.34
+# 1844505072         1.32
+# 1644430081         1.31
+# 5553957443         1.11
+# 2347167796         1.11
+
+min_sleep %>% 
+  group_by(Id) %>% 
+  summarize(avg_slpstate = mean(value)) %>% 
+  arrange(avg_slpstate) #top 5 Ids with MOST sleep
+# 8053475328         1.01
+# 4558609924         1.02
+# 7086361926         1.04
+# 6962181067         1.05
+# 1927972279         1.05
+
+class(min_sleep$date)
+min_sleep<-min_sleep %>% 
+  separate(date, c("day", "time", "meridiem"),sep= " ")
+
+min_sleep<-min_sleep %>% 
+  separate(day, c("month","day", "year", sep="/"))
+class(min_sleep$month)
+
+min_sleep$month<-as.factor(min_sleep$month)
+levels(min_sleep$month)#only two months okay..
+# 3 and 4 numericals (factors)
+min_sleep$month<-as.character(min_sleep$month)
+min_sleep$month[min_sleep$month == "3"]<-"03"
+min_sleep$month[min_sleep$month == "4"]<-"04"
+
+min_sleep<-min_sleep %>% 
+  mutate(ymd = paste(min_sleep$year,
+                     min_sleep$month,min_sleep$day, sep = "-"))
+min_sleep$ymd<-as.Date(min_sleep$ymd)
+class(min_sleep$ymd)
+
+class(min_sleep$value)
+class(min_sleep$Id)
+
+ggplot(min_sleep, aes(ymd,value))+
+  geom_point(aes(color = as.factor(Id),
+                 shape = as.factor(value)))+
+  facet_wrap(~Id)
+#okay i think the issue of overlap is that I did not include time
+#fix it
+
+class(min_sleep$time)
+min_sleep<-min_sleep %>% 
+  separate(time, c("hours", "minutes", "seconds", sep=":"))
+
+min_sleep<-min_sleep %>% 
+  select(-`:`)
+
+min_sleep$hours<-as.factor(min_sleep$hours)
+levels(min_sleep$hours)
+
+min_sleep$hours<-as.character(min_sleep$hours)
+min_sleep$hours[min_sleep$hours == "1"]<-"01"
+min_sleep$hours[min_sleep$hours == "2"]<-"02"
+min_sleep$hours[min_sleep$hours == "3"]<-"03"
+min_sleep$hours[min_sleep$hours == "4"]<-"04"
+min_sleep$hours[min_sleep$hours == "5"]<-"05"
+min_sleep$hours[min_sleep$hours == "6"]<-"06"
+min_sleep$hours[min_sleep$hours == "7"]<-"07"
+min_sleep$hours[min_sleep$hours == "8"]<-"08"
+min_sleep$hours[min_sleep$hours == "9"]<-"09"
+
+min_sleep<-min_sleep %>%
+  mutate(date_time = paste(min_sleep$ymd, min_sleep$time, sep = " "))
+
+min_sleep<-min_sleep %>%
+  mutate(hms = paste(min_sleep$hours,min_sleep$minutes,
+                     min_sleep$seconds, sep = ":"))
+
+min_sleep<-min_sleep %>%
+  mutate(yr_m_d_hms = paste(min_sleep$ymd,min_sleep$hms, sep=" "))
+
+min_sleep$yr_m_d_hms<-ymd_hms(min_sleep$yr_m_d_hms)
+class(min_sleep$yr_m_d_hms)
+#finally, now plot again
+
+#convert Id to factor
+min_sleep$Id<-as.factor(min_sleep$Id)
+
+ggplot(min_sleep, aes(yr_m_d_hms,value))+
+  geom_point(aes(color = Id,
+                 shape = as.character(value)))+
+  facet_wrap(~Id)
+
+#plotting the most complete one
+min_sleep %>% 
+  filter(Id == "8378563200") %>% 
+  ggplot(aes(yr_m_d_hms,value))+
+  geom_point(aes(color=value))+
+  theme_bw()
+
+#take away most are not using their fitbit for sleep tracking
+#completely or fitbit is not working properly
+```
+
+
+# Daily Steps Data
+```{r}
+hr_steps<-read.csv("C:\\Users\\deyvi\\OneDrive\\Desktop\\R files\\mturkfitbit_export_3.12.16-4.11.16\\Fitabase Data 3.12.16-4.11.16\\hourlySteps_merged.csv")
+
+n_distinct(hr_steps$Id) #34, but only 30 Ids at max are expected 
+
+#clean date-time
+#do a geom_step plot 
+
+hr_steps<-hr_steps %>% 
+  separate(ActivityHour, c("day", "time", "meridiem"),sep= " ")
+
+hr_steps<-hr_steps %>% 
+  separate(day, c("month","day", "year", sep="/"))
+class(hr_steps$month)
+
+hr_steps$month<-as.factor(hr_steps$month)
+levels(hr_steps$month)#only two months okay..
+# 3 and 4 numericals (factors)
+hr_steps$month<-as.character(hr_steps$month)
+hr_steps$month[hr_steps$month == "3"]<-"03"
+hr_steps$month[hr_steps$month == "4"]<-"04"
+
+hr_steps<-hr_steps %>% 
+  select(-`/`)
+
+hr_steps<-hr_steps %>% 
+  mutate(ymd = paste(hr_steps$year,
+                     hr_steps$month,hr_steps$day, sep = "-"))
+hr_steps$ymd<-as.Date(hr_steps$ymd)
+class(hr_steps$ymd)
+
+class(hr_steps$time)
+hr_steps<-hr_steps %>% 
+  separate(time, c("hours", "minutes", "seconds", sep=":"))
+hr_steps<-hr_steps %>% 
+  select(-`:`)
+
+
+hr_steps$hours<-as.factor(hr_steps$hours)
+levels(hr_steps$hours)
+
+hr_steps$hours<-as.character(hr_steps$hours)
+hr_steps$hours[hr_steps$hours == "1"]<-"01"
+hr_steps$hours[hr_steps$hours == "2"]<-"02"
+hr_steps$hours[hr_steps$hours == "3"]<-"03"
+hr_steps$hours[hr_steps$hours == "4"]<-"04"
+hr_steps$hours[hr_steps$hours == "5"]<-"05"
+hr_steps$hours[hr_steps$hours == "6"]<-"06"
+hr_steps$hours[hr_steps$hours == "7"]<-"07"
+hr_steps$hours[hr_steps$hours == "8"]<-"08"
+hr_steps$hours[hr_steps$hours == "9"]<-"09"
+
+hr_steps<-hr_steps %>%
+  mutate(hms = paste(hr_steps$hours,hr_steps$minutes,
+                     hr_steps$seconds, sep = ":"))
+
+hr_steps<-hr_steps %>%
+  mutate(yr_m_d_hms = paste(hr_steps$ymd,hr_steps$hms, sep=" "))
+
+hr_steps$yr_m_d_hms<-ymd_hms(hr_steps$yr_m_d_hms)
+class(hr_steps$yr_m_d_hms)
+
+hr_steps$Id<-as.factor(hr_steps$Id)
+ggplot(hr_steps, aes(yr_m_d_hms,StepTotal))+
+  geom_step(aes(color=Id))+
+  theme_classic()+
+  facet_wrap(~Id)
+#8877689391 seems to be the most active
+
+hr_steps %>% 
+  filter(Id == "8583815059") %>% 
+  ggplot(aes(yr_m_d_hms,StepTotal))+
+  geom_step(color="pink")+
+  theme_bw()+
+  ggtitle("Id = 8583815059")
+
+hr_steps %>% 
+  filter(Id == "8583815059") %>%
+  filter(month == "04") %>% 
+  ggplot(aes(yr_m_d_hms,StepTotal))+
+  geom_step(color="pink3")+
+  theme_bw()+
+  ggtitle("Id = 8583815059 April only")
+
+hr_steps %>% 
+  filter(Id == "8583815059") %>%
+  filter(month == "04") %>% 
+  ggplot(aes(yr_m_d_hms,StepTotal))+
+  geom_point(color="salmon")+
+  theme_bw()+
+  ggtitle("Id = 8583815059 April only")
+#okay from the scatter we know this person
+#doesn't use the fitbit after mid-day
+```
+
+
+# Session Info
+```{r}
+sessionInfo()
+```
+
